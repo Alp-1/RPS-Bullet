@@ -1,10 +1,10 @@
-#include <btBulletDynamicsCommon.h>  // Bullet Physics core
+#include <btBulletDynamicsCommon.h>  // Bullet Physics core, linter error
 #include <GL/glew.h>                 // OpenGL Extension Wrangler
 #include <GLFW/glfw3.h>              // GLFW for window/context and input
 #include <GL/glu.h>                  // GLU for gluLookAt
 #include <vector>                    // std::vector for lists
 #include <iostream>                  // std::cout, std::cerr
-#include <opencv2/opencv.hpp>        // OpenCV for image processing
+#include <opencv2/opencv.hpp>        // OpenCV for image processing, linter error
 #include <algorithm>                 // for std::minmax_element
 
 // Terrain descriptor holds gravity and plane parameters
