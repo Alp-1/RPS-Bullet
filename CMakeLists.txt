@@ -1,35 +1,42 @@
-cmake_minimum_required(VERSION 3.16)
-project(RPS LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.28)
+project(SFML_Bullet_ImGui LANGUAGES CXX)
 
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Bullet MODULE REQUIRED)
-find_package(OpenGL REQUIRED)           # defines OPENGL_LIBRARIES & OPENGL_glu_LIBRARY
-find_package(GLEW REQUIRED)
-find_package(glfw3 3.3 REQUIRED)
-find_package(OpenCV REQUIRED)
-find_package(HDF5 REQUIRED COMPONENTS C HL)
-find_package(Protobuf REQUIRED)
+include(FetchContent)
 
-add_executable(RPS src/main.cpp)
+# SFML
+FetchContent_Declare(SFML
+    GIT_REPOSITORY https://github.com/SFML/SFML.git
+    GIT_TAG 3.0.1
+    GIT_SHALLOW ON
+    EXCLUDE_FROM_ALL
+    SYSTEM)
+FetchContent_MakeAvailable(SFML)
 
-target_include_directories(RPS PRIVATE
-        ${BULLET_INCLUDE_DIRS}
-        ${OPENGL_INCLUDE_DIRS}
-        ${GLEW_INCLUDE_DIRS}
-        ${OpenCV_INCLUDE_DIRS}
-        ${HDF5_INCLUDE_DIRS}
+# Bullet Physics
+FetchContent_Declare(bullet
+    GIT_REPOSITORY https://github.com/bulletphysics/bullet3.git
+    GIT_TAG master
+    GIT_SHALLOW ON
+    EXCLUDE_FROM_ALL)
+FetchContent_MakeAvailable(bullet)
+
+
+# Executable
+add_executable(main src/main.cpp)
+target_compile_features(main PRIVATE cxx_std_17)
+
+target_include_directories(main PRIVATE
+    ${bullet_SOURCE_DIR}/src
 )
 
-target_link_libraries(RPS PRIVATE
-        ${BULLET_LIBRARIES}
-        OpenGL::GL
-        ${OPENGL_glu_LIBRARY}      # <— add this
-        GLEW::GLEW
-        glfw
-        ${OpenCV_LIBS}
-        ${HDF5_LIBRARIES}
-        ${HDF5_HL_LIBRARIES}
-        protobuf::libprotobuf
+target_link_libraries(main
+    PRIVATE
+        SFML::Graphics
+        BulletDynamics
+        BulletCollision
+        LinearMath
 )

@@ -1,11 +1,10 @@
-#include <btBulletDynamicsCommon.h>  // Bullet Physics core, linter error
-#include <GL/glew.h>                 // OpenGL Extension Wrangler
-#include <GLFW/glfw3.h>              // GLFW for window/context and input
-#include <GL/glu.h>                  // GLU for gluLookAt
+#include <SFML/Graphics.hpp>
+#include <btBulletDynamicsCommon.h>
+#include "BulletCollision/CollisionShapes/btHeightfieldTerrainShape.h"
 #include <vector>                    // std::vector for lists
 #include <iostream>                  // std::cout, std::cerr
-#include <opencv2/opencv.hpp>        // OpenCV for image processing, linter error
 #include <algorithm>                 // for std::minmax_element
+#include <random>
 
 // Terrain descriptor holds gravity and plane parameters
 struct TerrainDescriptor {
@@ -46,34 +45,39 @@ void initPhysics() {
 }
 
 
-int heightmapToTerrain(const std::string& path,
-                       TerrainDescriptor& descriptor)
+int heightmapToTerrain(const std::string& path, TerrainDescriptor& descriptor)
 {
-  cv::Mat image = cv::imread(path, cv::IMREAD_GRAYSCALE);
-  if (image.empty()) return -1;
-
-  int width  = image.cols;
-  int height = image.rows;
-  descriptor.rows = height;
-  descriptor.cols = width;
-  descriptor.heightData.resize(height * width);
-  descriptor.heightScale = 1.0f;  // TO DO: temporary placeholder needs to be driven by the URDF description of the agent
-
-  for (int y = 0; y < height; ++y) {
-    for (int x = 0; x < width; ++x) {
-      float normalized = image.at<uchar>(y,x) / 255.0f;
-      descriptor.heightData[y*width + x] = normalized * descriptor.heightScale;
+    sf::Image image;
+    if (!image.loadFromFile(path)) {
+        return -1;
     }
-  }
 
-  // compute min/max
-  auto mm = std::minmax_element(
-               descriptor.heightData.begin(),
-               descriptor.heightData.end());
-  descriptor.minHeight = *mm.first;
-  descriptor.maxHeight = *mm.second;
+    sf::Vector2u size = image.getSize();
+    int width = size.x;
+    int height = size.y;
 
-  return 0;
+    descriptor.cols = width;
+    descriptor.rows = height;
+    descriptor.heightData.resize(height * width);
+    descriptor.heightScale = 1.0f;  // TO DO: Replace with agent's URDF info
+
+    for (unsigned y = 0; y < height; ++y) {
+        for (unsigned x = 0; x < width; ++x) {
+            sf::Color pixel = image.getPixel({x, y});
+            // Convert to grayscale assuming the image is already grayscale
+            float normalized = pixel.r / 255.0f;
+            descriptor.heightData[y * width + x] = normalized * descriptor.heightScale;
+        }
+    }
+
+    // Compute min/max
+    auto mm = std::minmax_element(
+        descriptor.heightData.begin(), descriptor.heightData.end());
+
+    descriptor.minHeight = *mm.first;
+    descriptor.maxHeight = *mm.second;
+
+    return 0;
 }
 
 // Build terrain only: set gravity and add infinite plane
@@ -91,6 +95,16 @@ void buildTerrain(
     // 3) if loader succeeded AND we have data, build heightfield
     if (result == 0 && !descriptor.heightData.empty()) {
         // ––– build btHeightfieldTerrainShape here –––
+        // // Create Bullet heightfield shape
+        auto heightfieldShape = new btHeightfieldTerrainShape(
+            descriptor.cols, descriptor.rows,
+            descriptor.heightData.data(),
+            descriptor.heightScale,                // height scale
+            descriptor.minHeight, descriptor.maxHeight,        // min/max height
+            1,                   // up axis (Y = 1)
+            PHY_FLOAT,           // data type
+            false                // flip quad edges
+        );
     }
     else {
         // ––– fall back to the infinite plane –––
@@ -109,35 +123,8 @@ void buildTerrain(
 }
 
 
-// Initialize OpenGL state after context creation
-void initGL() {
-    glewInit();
-    glEnable(GL_DEPTH_TEST);
-    glDisable(GL_CULL_FACE);
-    glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
-}
 
 int main() {
-    // 1. Initialize GLFW
-    if (!glfwInit()) {
-        std::cerr << "Failed to initialize GLFW\n";
-        return -1;
-    }
-    GLFWwindow* window = glfwCreateWindow(
-        800, 600,
-        "Bullet Physics Terrain Demo",
-        nullptr, nullptr
-    );
-    if (!window) {
-        std::cerr << "Failed to create GLFW window\n";
-        glfwTerminate();
-        return -1;
-    }
-    glfwMakeContextCurrent(window);
-    std::cout << "OpenGL Version: " << glGetString(GL_VERSION) << "\n";
-
-    // 2. Initialize GL and Bullet
-    initGL();
     initPhysics();
 
     // 3. Build only the terrain
@@ -145,51 +132,38 @@ int main() {
     terrain.gravity     = btVector3(0, -9.81f, 0);
     terrain.planeNormal = btVector3(0,  1.0f, 0);
     terrain.planeOffset = 0.0f;
+    terrain.heightmapPath = "heightmap.png";
     buildTerrain(dynamicsWorld, terrain);
 
-    // 4. Main render loop
-    while (!glfwWindowShouldClose(window)) {
-        glfwPollEvents();
-        dynamicsWorld->stepSimulation(1.0f / 60.0f);
 
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    const unsigned width = 505;
+    const unsigned height = 505;
+    auto window = sf::RenderWindow(sf::VideoMode({width, height}), "RPS-Bullet");
+    window.setFramerateLimit(144);
 
-        // set up projection matrix
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        gluPerspective(
-            45.0f,               // field of view
-            800.0f / 600.0f,     // aspect ratio
-            0.1f,                // near clip
-            1000.0f              // far clip
-        );
 
-        // set up modelview matrix (camera)
-        glMatrixMode(GL_MODELVIEW);
-        glLoadIdentity();
-        gluLookAt(
-            1.0f, 15.0f,  0.0f,  // eye position
-            0.0f,  0.0f,  0.0f,  // look-at point
-            0.0f,  1.0f,  0.0f   // up vector
-        );
 
-        // draw reference axes
-        glBegin(GL_LINES);
-          glColor3f(1,0,0); glVertex3f(0,0,0); glVertex3f(10,0,0);
-          glColor3f(0,1,0); glVertex3f(0,0,0); glVertex3f(0,10,0);
-          glColor3f(0,0,1); glVertex3f(0,0,0); glVertex3f(0,0,10);
-        glEnd();
+    
 
-        // draw ground quad
-        glColor3f(0.7f, 0.7f, 0.7f);
-        glBegin(GL_QUADS);
-          glVertex3f(-5, 0, -5);
-          glVertex3f(-5, 0,  5);
-          glVertex3f( 5, 0,  5);
-          glVertex3f( 5, 0, -5);
-        glEnd();
+    sf::Image image("heightmap.png");
 
-        glfwSwapBuffers(window);
+    sf::Texture texture;
+    texture.loadFromImage(image, false, sf::IntRect({0, 0}, {width, height}));
+    sf::Sprite sprite(texture);
+
+    while (window.isOpen())
+    {
+        while (const std::optional event = window.pollEvent())
+        {
+            if (event->is<sf::Event::Closed>())
+            {
+                window.close();
+            }
+        }
+
+        window.clear();
+        window.draw(sprite);
+        window.display();
     }
 
     // 5. Cleanup Bullet objects
@@ -201,8 +175,6 @@ int main() {
     delete overlappingPairCache;
     delete dispatcher;
     delete collisionConfiguration;
-
-    // 6. Terminate GLFW
-    glfwTerminate();
+    
     return 0;
 }

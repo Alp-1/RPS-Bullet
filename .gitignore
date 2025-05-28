@@ -1,0 +1,27 @@
+# VS Code settings
+.vscode/
+
+# CMake build directories
+cmake-build-*/
+build/
+CMakeFiles/
+CMakeCache.txt
+Makefile
+cmake_install.cmake
+
+# Compiled object files and binaries
+*.o
+*.obj
+*.so
+*.exe
+*.out
+*.a
+*.lib
+*.dll
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+
+CMakePresets.json
