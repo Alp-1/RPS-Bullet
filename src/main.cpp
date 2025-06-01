@@ -5,6 +5,8 @@
 #include <iostream>                  // std::cout, std::cerr
 #include <algorithm>                 // for std::minmax_element
 #include <random>
+#include "lidarSensor.h"
+
 
 // Terrain descriptor holds gravity and plane parameters
 struct TerrainDescriptor {
@@ -122,8 +124,6 @@ void buildTerrain(
     }
 }
 
-
-
 int main() {
     initPhysics();
 
@@ -135,14 +135,21 @@ int main() {
     terrain.heightmapPath = "heightmap.png";
     buildTerrain(dynamicsWorld, terrain);
 
+    // LIDAR INSTANCE
+    if (terrain.cols == 0 || terrain.rows == 0) {
+        std::cerr << "Error: terrain dimensions are invalid." << std::endl;
+        return -1;
+    }
+    // LIDAR sensor at a fixed point above the terrain (e.g. 1 meter high)
+    btVector3 lidarPos(terrain.cols / 2.0f, 1.0f, terrain.rows / 2.0f); // Y is up
+    // Create Lidar Instance
+    lidarSensor lidar(dynamicsWorld, lidarPos, 20, -1.57f, 1.57f, 30.0f); // 180° horizontal scan, 20 beams
+    // LIDAR INSTANCE
 
     const unsigned width = 505;
     const unsigned height = 505;
     auto window = sf::RenderWindow(sf::VideoMode({width, height}), "RPS-Bullet");
     window.setFramerateLimit(144);
-
-
-
     
 
     sf::Image image("heightmap.png");
@@ -159,7 +166,29 @@ int main() {
             {
                 window.close();
             }
+
         }
+//Lidar tester starts
+        static float t = 0.0f;
+        t += 0.05f; // controls speed
+
+        // Move in a circle on the XZ plane
+        float radius = 50.0f;
+        float x = terrain.cols / 2.0f + radius * std::cos(t);
+        float z = terrain.rows / 2.0f + radius * std::sin(t);
+        float y = 1.0f; // fixed height above terrain
+
+        btVector3 newOrigin(x, y, z);
+        lidar.setOrigin(newOrigin);
+
+        // Perform a LIDAR scan (every frame for now)
+        auto distances = lidar.scan();
+        std::cout << "LIDAR scan: ";
+        for (float d : distances) {
+            std::cout << d << " ";
+        }
+        std::cout << std::endl;
+// Lidar tester ends
 
         window.clear();
         window.draw(sprite);

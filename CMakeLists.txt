@@ -26,11 +26,15 @@ FetchContent_MakeAvailable(bullet)
 
 
 # Executable
-add_executable(main src/main.cpp)
+add_executable(main src/main.cpp
+        src/lidarSensor.cpp
+        src/lidarSensor.h)
 target_compile_features(main PRIVATE cxx_std_17)
 
 target_include_directories(main PRIVATE
     ${bullet_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+
 )
 
 target_link_libraries(main
